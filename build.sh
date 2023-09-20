@@ -3,18 +3,18 @@
 # BEGIN PARAMETER ZONE
 ## ODbeta params
 ODBETA_DOWNLOAD_PLAN="A"        # "A": Direct download; "B": Artifact from GHAction
-ODBETA_VERSION=2022-02-13       # ODbeta version to install. It should correspond with direct download or GHArtifact
+ODBETA_VERSION=2023-09-19       # ODbeta version to install. It should correspond with direct download or GHArtifact
 ### For plan "A"
-ODBETA_DIR_URL=http://od.abstraction.se/opendingux/26145a93f2e17d0df86ae20b7af455ea155e169c
+ODBETA_DIR_URL=../opendingux-buildroot/output/images  #http://od.abstraction.se/opendingux/26145a93f2e17d0df86ae20b7af455ea155e169c
 ### For plan "B"
 ODBETA_ARTIFACT_ID=287825131    # ID of `update-gcw0` artifact in last workflow execution of `opendingux`
                                 # branch in https://github.com/OpenDingux/buildroot repository
 GITHUB_ACCOUNT=PUT_HERE_YOUR_GITHUB_ACCOUNT
 GITHUB_TOKEN=PUT_HERE_A_GITHUB_TOKEN
 ## Other params
-MAKE_PGv1=true                  # Build image for GCW-Zero and PocketGo2 v1
+MAKE_PGv1=false                  # Build image for GCW-Zero and PocketGo2 v1
 MAKE_RG=true                    # Build image for RG350 and derived
-COMP=xz                         # gz or xz
+COMP=gz                         # gz or xz
 P1_SIZE_SECTOR=819168           # Size of partition 1 in sectors (819168 sectors= ~400M)
 SIZE_M=3200                     # Final image size in MiB
 # END PARAMETER ZONE
@@ -37,8 +37,8 @@ rootcheck () {
         sudo "$0" "$@"
         sudo chown -R $(id -u):$(id -g) "${DIRECTORY}/releases"
         sudo chown -R $(id -u):$(id -g) "${DIRECTORY}/select_kernel"
-        sudo chown -R $(id -u):$(id -g) "${DIRECTORY}/retroarch/build_odb"
-        sudo chown -R $(id -u):$(id -g) "${DIRECTORY}/retroarch/releases"
+#        sudo chown -R $(id -u):$(id -g) "${DIRECTORY}/retroarch/build_odb"
+#        sudo chown -R $(id -u):$(id -g) "${DIRECTORY}/retroarch/releases"
         exit $?
     fi
 }
@@ -60,7 +60,9 @@ if [ ! -f "${DIRECTORY}/select_kernel/${ODBETA_DIST_FILE}" ] ; then
         A)
             echo "## Downloading ODBeta distribution"
             ODBETA_DIST_URL=${ODBETA_DIR_URL}/${ODBETA_DIST_FILE}
-            wget -q -P "${DIRECTORY}/select_kernel" ${ODBETA_DIST_URL}
+            #wget -q -P "${DIRECTORY}/select_kernel" ${ODBETA_DIST_URL}
+            cp -rf ${ODBETA_DIST_URL} "${DIRECTORY}/select_kernel" 
+
             status=$?
             [ ! ${status} -eq 0 ] && echo "@@ ERROR: Problem downloading ODBeta distribution" && exit 1
             ;;
@@ -112,6 +114,9 @@ mkfs.ext4 -F -O ^64bit -O ^metadata_csum -O uninit_bg -L '' -q ${DEVICE}p2
 sync
 sleep 1
 
+#ls "${DIRECTORY}/select_kernel/squashfs-root"
+#read -p "HELLO!!!"
+
 echo "## Mounting P1"
 mkdir "${DIRECTORY}/mnt_p1"
 mount -t vfat ${DEVICE}p1 "${DIRECTORY}/mnt_p1"
@@ -130,43 +135,46 @@ fi
 
 cd "${DIRECTORY}"
 
-cp "${DIRECTORY}/select_kernel/squashfs-root/gcw0/rootfs.squashfs" "${DIRECTORY}/mnt_p1"
-sha1sum "${DIRECTORY}/select_kernel/squashfs-root/gcw0/rootfs.squashfs" | awk '{ print $1 }'>"${DIRECTORY}/mnt_p1/rootfs.squashfs.sha1"
-cp "${DIRECTORY}/select_kernel/squashfs-root/gcw0/mininit-syspart" "${DIRECTORY}/mnt_p1"
-cp "${DIRECTORY}/select_kernel/squashfs-root/gcw0/mininit-syspart.sha1" "${DIRECTORY}/mnt_p1"
-cp "${DIRECTORY}/select_kernel/squashfs-root/gcw0/modules.squashfs" "${DIRECTORY}/mnt_p1"
-cp "${DIRECTORY}/select_kernel/squashfs-root/gcw0/modules.squashfs.sha1" "${DIRECTORY}/mnt_p1"
+cp "${ODBETA_DIR_URL}/rootfs.squashfs" "${DIRECTORY}/mnt_p1"
+sha1sum "${ODBETA_DIR_URL}/rootfs.squashfs" | awk '{ print $1 }'>"${DIRECTORY}/mnt_p1/rootfs.squashfs.sha1"
+cp "${ODBETA_DIR_URL}/mininit-syspart" "${DIRECTORY}/mnt_p1"
+sha1sum "${ODBETA_DIR_URL}/mininit-syspart" | awk '{ print $1 }'>"${DIRECTORY}/mnt_p1/mininit-syspart.sha1"
+cp "${ODBETA_DIR_URL}/modules.squashfs" "${DIRECTORY}/mnt_p1"
+sha1sum "${ODBETA_DIR_URL}/modules.squashfs" | awk '{ print $1 }'>"${DIRECTORY}/mnt_p1/modules.squashfs.sha1"
 mkdir "${DIRECTORY}/mnt_p1/dev"
 mkdir "${DIRECTORY}/mnt_p1/root"
+
+#read -p "HELLO!"
 
 echo "## Mounting P2"
 mkdir "${DIRECTORY}/mnt_p2"
 mount -t ext4 ${DEVICE}p2 "${DIRECTORY}/mnt_p2"
 sleep 1
 
-echo "## Installing RetroArch stuff in P2"
-E_BUILD_STOCK=false E_BUILD_ODBETA=true E_CONF_CSV=all "${DIRECTORY}/retroarch/build.sh"
-status=$?
-[ ! ${status} -eq 0 ] && echo "@@ ERROR: Problem installing RetroArch stuff." && exit ${status}
-mkdir -p "${DIRECTORY}/mnt_p2/apps"
-cp -f "${DIRECTORY}/retroarch/files_odb/retroarch_rg350_odbeta.opk" "${DIRECTORY}/mnt_p2/apps"
-mkdir -p "${DIRECTORY}/mnt_p2/local/bin"
-cp -f "${DIRECTORY}/retroarch/files_odb/retroarch_rg350_odbeta" "${DIRECTORY}/mnt_p2/local/bin"
-# Installing OPK wrappers for cores
-tar -xzf "${DIRECTORY}/retroarch/files_odb/apps_ra.tgz" -C "${DIRECTORY}/mnt_p2/apps"
-# Installing home files
-mkdir -p "${DIRECTORY}/mnt_p2/local/home/.retroarch"
-tar -xzf "${DIRECTORY}/retroarch/files_odb/retroarch.tgz" -C "${DIRECTORY}/mnt_p2/local/home/.retroarch"
-# Installing GMenu2X links
-mkdir -p "${DIRECTORY}/mnt_p2/local/home/.gmenu2x/sections/retroarch"
-tar -xzf "${DIRECTORY}/retroarch/files_odb/links.tgz" -C "${DIRECTORY}/mnt_p2/local/home/.gmenu2x/sections/retroarch"
+#echo "## Installing RetroArch stuff in P2"
+#E_BUILD_STOCK=false E_BUILD_ODBETA=true E_CONF_CSV=all "${DIRECTORY}/retroarch/build.sh"
+#status=$?
+#[ ! ${status} -eq 0 ] && echo "@@ ERROR: Problem installing RetroArch stuff." && exit ${status}
+#mkdir -p "${DIRECTORY}/mnt_p2/apps"
+#cp -f "${DIRECTORY}/retroarch/files_odb/retroarch_rg350_odbeta.opk" "${DIRECTORY}/mnt_p2/apps"
+#mkdir -p "${DIRECTORY}/mnt_p2/local/bin"
+#cp -f "${DIRECTORY}/retroarch/files_odb/retroarch_rg350_odbeta" "${DIRECTORY}/mnt_p2/local/bin"
+## Installing OPK wrappers for cores
+#tar -xzf "${DIRECTORY}/retroarch/files_odb/apps_ra.tgz" -C "${DIRECTORY}/mnt_p2/apps"
+## Installing home files
+#mkdir -p "${DIRECTORY}/mnt_p2/local/home/.retroarch"
+#tar -xzf "${DIRECTORY}/retroarch/files_odb/retroarch.tgz" -C "${DIRECTORY}/mnt_p2/local/home/.retroarch"
+## Installing GMenu2X links
+#mkdir -p "${DIRECTORY}/mnt_p2/local/home/.gmenu2x/sections/retroarch"
+#tar -xzf "${DIRECTORY}/retroarch/files_odb/links.tgz" -C "${DIRECTORY}/mnt_p2/local/home/.gmenu2x/sections/retroarch"
+
 sync
 
 echo "## Installing Adam stuff in P2"
-rm -rf "${DIRECTORY}/mnt_p2/local/home/.retroarch/system"
+#rm -rf "${DIRECTORY}/mnt_p2/local/home/.retroarch/system"
 cp -r "${DIRECTORY}/data"/* "${DIRECTORY}/mnt_p2"
 find "${DIRECTORY}/mnt_p2" -name .gitignore -delete
-cp "${DIRECTORY}/assets/dosbox_pure_libretro.so" "${DIRECTORY}/mnt_p2/local/home/.retroarch/cores/"
+#cp "${DIRECTORY}/assets/dosbox_pure_libretro.so" "${DIRECTORY}/mnt_p2/local/home/.retroarch/cores/"
 
 echo "## Putting up version file flag"
 echo ${VERSION} > "${DIRECTORY}/mnt_p2/adam_version.txt"
@@ -234,15 +242,15 @@ if [ ${MAKE_RG} = true ] ; then
     cp "${DIRECTORY}/select_kernel/select_kernel.bat" "${DIRECTORY}/mnt_p1"
     cp "${DIRECTORY}/select_kernel/select_kernel.sh" "${DIRECTORY}/mnt_p1"
     mkdir "${DIRECTORY}/mnt_p1/rg280v"
-    mkdir "${DIRECTORY}/mnt_p1/rg280m"
+#    mkdir "${DIRECTORY}/mnt_p1/rg280m"
     mkdir "${DIRECTORY}/mnt_p1/rg350"
     mkdir "${DIRECTORY}/mnt_p1/rg350m"
     mkdir "${DIRECTORY}/mnt_p1/pocketgo2v2"
     mkdir "${DIRECTORY}/mnt_p1/rg300x"
     cat "${DIRECTORY}/select_kernel/squashfs-root/gcw0/uzImage.bin" "${DIRECTORY}/select_kernel/squashfs-root/gcw0/rg280v.dtb" > "${DIRECTORY}/mnt_p1/rg280v/uzImage.bin"
     sha1sum "${DIRECTORY}/mnt_p1/rg280v/uzImage.bin" | awk '{ print $1 }'>"${DIRECTORY}/mnt_p1/rg280v/uzImage.bin.sha1"
-    cat "${DIRECTORY}/select_kernel/squashfs-root/gcw0/uzImage.bin" "${DIRECTORY}/select_kernel/squashfs-root/gcw0/rg280m.dtb" > "${DIRECTORY}/mnt_p1/rg280m/uzImage.bin"
-    sha1sum "${DIRECTORY}/mnt_p1/rg280m/uzImage.bin" | awk '{ print $1 }'>"${DIRECTORY}/mnt_p1/rg280m/uzImage.bin.sha1"
+#    cat "${DIRECTORY}/select_kernel/squashfs-root/gcw0/uzImage.bin" "${DIRECTORY}/select_kernel/squashfs-root/gcw0/rg280m.dtb" > "${DIRECTORY}/mnt_p1/rg280m/uzImage.bin"
+#    sha1sum "${DIRECTORY}/mnt_p1/rg280m/uzImage.bin" | awk '{ print $1 }'>"${DIRECTORY}/mnt_p1/rg280m/uzImage.bin.sha1"
     cat "${DIRECTORY}/select_kernel/squashfs-root/gcw0/uzImage.bin" "${DIRECTORY}/select_kernel/squashfs-root/gcw0/rg350.dtb" > "${DIRECTORY}/mnt_p1/rg350/uzImage.bin"
     sha1sum "${DIRECTORY}/mnt_p1/rg350/uzImage.bin" | awk '{ print $1 }'>"${DIRECTORY}/mnt_p1/rg350/uzImage.bin.sha1"
     cat "${DIRECTORY}/select_kernel/squashfs-root/gcw0/uzImage.bin" "${DIRECTORY}/select_kernel/squashfs-root/gcw0/rg350m.dtb" > "${DIRECTORY}/mnt_p1/rg350m/uzImage.bin"
