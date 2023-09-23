@@ -1,18 +1,26 @@
 #!/bin/bash
 
+set -e
+
+( \
+cd buildroot; \
+make BR2_EXTERNAL=board/opendingux -j5; \
+)
+
+
 # BEGIN PARAMETER ZONE
 ## ODbeta params
 ODBETA_DOWNLOAD_PLAN="A"        # "A": Direct download; "B": Artifact from GHAction
-ODBETA_VERSION=2023-09-19       # ODbeta version to install. It should correspond with direct download or GHArtifact
+#ODBETA_VERSION=2023-09-23       # ODbeta version to install. It should correspond with direct download or GHArtifact
 ### For plan "A"
-ODBETA_DIR_URL=../opendingux-buildroot/output/images  #http://od.abstraction.se/opendingux/26145a93f2e17d0df86ae20b7af455ea155e169c
+ODBETA_DIR_URL=buildroot/output/images  #http://od.abstraction.se/opendingux/26145a93f2e17d0df86ae20b7af455ea155e169c
 ### For plan "B"
 ODBETA_ARTIFACT_ID=287825131    # ID of `update-gcw0` artifact in last workflow execution of `opendingux`
                                 # branch in https://github.com/OpenDingux/buildroot repository
 GITHUB_ACCOUNT=PUT_HERE_YOUR_GITHUB_ACCOUNT
 GITHUB_TOKEN=PUT_HERE_A_GITHUB_TOKEN
 ## Other params
-MAKE_PGv1=false                  # Build image for GCW-Zero and PocketGo2 v1
+MAKE_PGv1=true                  # Build image for GCW-Zero and PocketGo2 v1
 MAKE_RG=true                    # Build image for RG350 and derived
 COMP=gz                         # gz or xz
 P1_SIZE_SECTOR=819168           # Size of partition 1 in sectors (819168 sectors= ~400M)
@@ -25,7 +33,7 @@ INSTALL_ODBETA_MODS=false
 # Constants of convenience
 DIRECTORY=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)
 VERSION=$(cat ${DIRECTORY}/v)
-ODBETA_DIST_FILE=gcw0-update-${ODBETA_VERSION}.opk
+ODBETA_DIST_FILE=gcw0-update-latest.opk
 SECTOR_SIZE=512
 P1_OFFSET_SECTOR=32
 
@@ -114,9 +122,6 @@ mkfs.ext4 -F -O ^64bit -O ^metadata_csum -O uninit_bg -L '' -q ${DEVICE}p2
 sync
 sleep 1
 
-#ls "${DIRECTORY}/select_kernel/squashfs-root"
-#read -p "HELLO!!!"
-
 echo "## Mounting P1"
 mkdir "${DIRECTORY}/mnt_p1"
 mount -t vfat ${DEVICE}p1 "${DIRECTORY}/mnt_p1"
@@ -125,13 +130,17 @@ sleep 1
 cd "${DIRECTORY}/select_kernel"
 unsquashfs "${DIRECTORY}/select_kernel/${ODBETA_DIST_FILE}" > /dev/null
 
-if [ ${INSTALL_ODBETA_MODS} = true ] ; then
-    echo "## Installing script S99resize_p2.sh in rootfs.squashfs"
-    cd "${DIRECTORY}/select_kernel/squashfs-root/gcw0"
-    unsquashfs rootfs.squashfs > /dev/null
-    cp "${DIRECTORY}/assets/S99resize_p2.sh" "${DIRECTORY}/select_kernel/squashfs-root/gcw0/squashfs-root/etc/init.d"
-    mksquashfs squashfs-root rootfs.squashfs -noappend -comp zstd > /dev/null
-fi
+#echo "## Taking the rootfs"
+#mkdir -p "${DIRECTORY}/select_kernel/squashfs-root/gcw0/"
+#cp "${ODBETA_DIR_URL}/rootfs.squashfs" "${DIRECTORY}/select_kernel/squashfs-root/gcw0/"
+
+#if [ ${INSTALL_ODBETA_MODS} = true ] ; then
+#    echo "## Installing script S99resize_p2.sh in rootfs.squashfs"
+#    cd "${DIRECTORY}/select_kernel/squashfs-root/gcw0"
+#    unsquashfs rootfs.squashfs > /dev/null
+#    cp "${DIRECTORY}/assets/S99resize_p2.sh" "${DIRECTORY}/select_kernel/squashfs-root/gcw0/squashfs-root/etc/init.d"
+#    mksquashfs squashfs-root rootfs.squashfs -noappend -comp zstd > /dev/null
+#fi
 
 cd "${DIRECTORY}"
 
@@ -143,8 +152,6 @@ cp "${ODBETA_DIR_URL}/modules.squashfs" "${DIRECTORY}/mnt_p1"
 sha1sum "${ODBETA_DIR_URL}/modules.squashfs" | awk '{ print $1 }'>"${DIRECTORY}/mnt_p1/modules.squashfs.sha1"
 mkdir "${DIRECTORY}/mnt_p1/dev"
 mkdir "${DIRECTORY}/mnt_p1/root"
-
-#read -p "HELLO!"
 
 echo "## Mounting P2"
 mkdir "${DIRECTORY}/mnt_p2"
@@ -293,3 +300,5 @@ if [ -f "${DIRECTORY}/sd_int.img" ] ; then
 fi
 rmdir "${DIRECTORY}/mnt_p1"
 rmdir "${DIRECTORY}/mnt_p2"
+
+echo "## Building done!"
