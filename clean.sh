@@ -3,11 +3,14 @@
 set -e
 
 ( \
+export CONFIG=gcw0; \
 cd buildroot; \
-make BR2_EXTERNAL=board/opendingux clean; \
+./build.sh clean; \
 )
 
-rm releases/*
-rm select_kernel/*.opk
+rm -rf buildroot/output		# Finishing the buildroot cleaning
+
+rm -rf releases/*
+rm -rf select_kernel/*.opk
 
 echo "## Cleaned successfully!"

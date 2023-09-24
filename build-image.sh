@@ -2,12 +2,6 @@
 
 set -e
 
-( \
-cd buildroot; \
-make BR2_EXTERNAL=board/opendingux -j5; \
-)
-
-
 # BEGIN PARAMETER ZONE
 ## ODbeta params
 ODBETA_DOWNLOAD_PLAN="A"        # "A": Direct download; "B": Artifact from GHAction
