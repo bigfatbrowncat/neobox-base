@@ -2,20 +2,23 @@
 
 set -e
 
-if [ ! -f "buildroot/output/gcw0/images" ]; then
-	mkdir -p buildroot/output/gcw0;
+export CONFIG=gcw0
+
+if [ ! -d "releases" ] ; then
+    mkdir "releases"
+fi
+
+if [ ! -d "buildroot/output/$CONFIG/images" ]; then
+	mkdir -p "buildroot/output/$CONFIG";
 	( \
 		cd buildroot/output/gcw0; \
 		ln -s ../../../releases images; \
 	)
 fi
 
-exit(123)
-
 ( \
-export CONFIG=gcw0; \
 cd buildroot; \
-./build.sh gcw0; \
+./build.sh all; \
 )
 
 #make BR2_EXTERNAL=board/opendingux od_gcw0_defconfig
