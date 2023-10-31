@@ -14,8 +14,10 @@ DST=`realpath $2`
   tar xf $SRC; \
   rm gcw0-toolchain/lib64; \
   rm gcw0-toolchain/usr; \
-  rm -rf gcw0-toolchain/libexec/gcc/x86_64-w64-mingw32; \
   find gcw0-toolchain/bin/ -type f,l ! -name "*.exe" -delete; \
+  find gcw0-toolchain/x86_64-w64-mingw32/bin/ -type f,l ! -name "*.exe" -delete; \
+  find gcw0-toolchain/mipsel-gcw0-linux-uclibc/bin/ -type f,l ! -name "*.exe" -delete; \
+  find gcw0-toolchain/libexec/gcc/x86_64-w64-mingw32 -type f,l ! -name "*.exe" -delete; \
   find gcw0-toolchain/libexec/gcc/mipsel-gcw0-linux-uclibc/12.2.0 -type f,l ! -name "*.?*" -delete; \
   find gcw0-toolchain/libexec/gcc/mipsel-gcw0-linux-uclibc/12.2.0 -type f,l ! -name "*.so*" -delete; \
   find gcw0-toolchain/libexec/gcc/mipsel-gcw0-linux-uclibc/12.2.0/plugin -type f,l ! -name "*.?*" -delete; \
