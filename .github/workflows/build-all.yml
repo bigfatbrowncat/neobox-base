@@ -17,6 +17,8 @@ jobs:
       - name: List files in the repository
         run: |
           ls ${{ github.workspace }}
+      - name: Install the dependencies
+        run: sudo apt-get install -y gcc-multilib
       - name: Build the OS buildroot
         run: |
           cd ${{ github.workspace }}
